@@ -5,10 +5,11 @@ cmake_minimum_required(VERSION 3.10)
 project(KCacheSystem)
 
 # 设置 C++ 标准
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CM
+AKE_CXX_STANDARD 17)# 使用 C++17 标准
+set(CMAKE_CXX_STANDARD_REQUIRED True) # 如果编译器不支持 C++17，则报错
 
-# 指定源文件目录下的所有 .cpp 文件
+# 指定源文件目录下的所有 .cpp 文件，自动查找源文件
 file(GLOB SOURCES "*.cpp")
 
 # 设置目标可执行文件

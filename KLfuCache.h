@@ -38,7 +38,9 @@ private:
     NodePtr tail_; // 假尾结点
 
 public:
-    explicit FreqList(int n) 
+
+//C++ 最佳实践：所有单参数构造函数都应该加 `explicit`，除非你明确需要隐式转换。
+    explicit FreqList(int n) //防止隐式类型转换带来的意外 bug。
      : freq_(n) 
     {
       head_ = std::make_shared<Node>();

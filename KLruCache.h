@@ -1,16 +1,15 @@
-#pragma once 
+#pragma once //确保头文件只被编译一次
 
-#include <cstring>
-#include <list>
-#include <memory>
-#include <mutex>
-#include <unordered_map>
+#include <cstring>//提供memset函数
+#include <list>//双向链表
+#include <memory>//智能指针
+#include <mutex>//互斥锁
+#include <unordered_map>//哈希表
 
 #include "KICachePolicy.h"
 
 namespace KamaCache
 {
-
 // 前向声明
 template<typename Key, typename Value> class KLruCache;
 
@@ -21,31 +20,36 @@ private:
     Key key_;
     Value value_;
     size_t accessCount_;  // 访问次数
-    std::weak_ptr<LruNode<Key, Value>> prev_;  // 改为weak_ptr打破循环引用
-    std::shared_ptr<LruNode<Key, Value>> next_;
+    std::weak_ptr<LruNode<Key, Value>> prev_;  // 改为weak_ptr打破循环引用；
+    // 弱引用指针，观察一个对象，但不增加引用计数，不能直接使用对象。
+
+    std::shared_ptr<LruNode<Key, Value>> next_;//共享指针，多个 `shared_ptr` 可以指向同一个对象，内部引用计数管理内存。
+
 
 public:
-    LruNode(Key key, Value value)
+    LruNode(Key key, Value value)//构造函数
         : key_(key)
         , value_(value)
         , accessCount_(1) 
     {}
 
     // 提供必要的访问器
-    Key getKey() const { return key_; }
+    Key getKey() const { return key_; }//const 成员函数，保证不会修改成员变量，可以被const对象调用;如果不加const，const 对象无法调用
     Value getValue() const { return value_; }
-    void setValue(const Value& value) { value_ = value; }
+    void setValue(const Value& value) { value_ = value; }//不会修改参数
     size_t getAccessCount() const { return accessCount_; }
     void incrementAccessCount() { ++accessCount_; }
 
-    friend class KLruCache<Key, Value>;
+    friend class KLruCache<Key, Value>; //KLruCache可以访问本类的私有成员
 };
 
 
 template<typename Key, typename Value>
-class KLruCache : public KICachePolicy<Key, Value>
+class KLruCache : public KICachePolicy<Key, Value>//继承KICachePolicy接口
 {
 public:
+    //C++11引入的类型别名，简化类型定义，增强代码可读性·
+    //using 新名字 = 原有类型;
     using LruNodeType = LruNode<Key, Value>;
     using NodePtr = std::shared_ptr<LruNodeType>;
     using NodeMap = std::unordered_map<Key, NodePtr>;
@@ -56,20 +60,22 @@ public:
         initializeList();
     }
 
-    ~KLruCache() override = default;
+    ~KLruCache() override = default;//使用默认析构函数，编译器会自动生成一个合适的析构函数来销毁对象，释放资源。
 
     // 添加缓存
     void put(Key key, Value value) override
     {
         if (capacity_ <= 0)
             return;
-    
-        std::lock_guard<std::mutex> lock(mutex_);
+        //自动锁管理器,用于自动管理 `std::mutex`（互斥锁）的加锁和解锁。
+        //命令执行时会自动调用 `lock()` 方法加锁；函数结束或者返回都会自动调用 `unlock()` 方法解锁，确保线程安全。
+        //mutex仅做作用于当前实例的锁，保护当前实例的成员变量不被多个线程同时访问，避免数据竞争和不一致。
+        std::lock_guard<std::mutex> lock(mutex_);//自动加锁和解锁，确保线程安全
         auto it = nodeMap_.find(key);
         if (it != nodeMap_.end())
         {
             // 如果在当前容器中,则更新value,并调用get方法，代表该数据刚被访问
-            updateExistingNode(it->second, value);
+            updateExistingNode(it->second, value);//更新节点的值，并将其移动到最近访问的位置
             return ;
         }
 
@@ -77,6 +83,7 @@ public:
     }
 
     bool get(Key key, Value& value) override
+    // 获取缓存，返回是否命中，并通过引用参数返回值
     {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = nodeMap_.find(key);
@@ -110,7 +117,7 @@ public:
     }
 
 private:
-    void initializeList()
+    void initializeList()//初始化函数，创建首尾虚拟节点，并将它们连接起来，形成一个空的双向链表。虚拟节点不存储实际数据，但简化了插入和删除操作的边界条件处理。
     {
         // 创建首尾虚拟节点
         dummyHead_ = std::make_shared<LruNodeType>(Key(), Value());
@@ -119,17 +126,17 @@ private:
         dummyTail_->prev_ = dummyHead_;
     }
 
-    void updateExistingNode(NodePtr node, const Value& value) 
+    void updateExistingNode(NodePtr node, const Value& value) //更新节点的值，并将其移动到最近访问的位置
     {
         node->setValue(value);
         moveToMostRecent(node);
     }
 
-    void addNewNode(const Key& key, const Value& value) 
+    void addNewNode(const Key& key, const Value& value) //添加新节点，
     {
-       if (nodeMap_.size() >= capacity_) 
+       if (nodeMap_.size() >= capacity_) //如果当前缓存已满，则先驱逐最近最少访问的节点，然后将新节点插入到链表的尾部，并更新哈希表中的映射关系。
        {
-           evictLeastRecent();
+           evictLeastRecent();// 驱逐最近最少访问的节点
        }
 
        NodePtr newNode = std::make_shared<LruNodeType>(key, value);
@@ -145,16 +152,16 @@ private:
     }
 
     void removeNode(NodePtr node) 
-    {
+    {   //!node->prev_.expired()判断前一个节点是否存在，
         if(!node->prev_.expired() && node->next_) 
         {
-            auto prev = node->prev_.lock(); // 使用lock()获取shared_ptr
+            auto prev = node->prev_.lock(); // 将 weak_ptr 转为 shared_ptr（如果没过期）
             prev->next_ = node->next_;
             node->next_->prev_ = prev;
             node->next_ = nullptr; // 清空next_指针，彻底断开节点与链表的连接
         }
     }
-
+ 
     // 从尾部插入结点
     void insertNode(NodePtr node) 
     {
@@ -173,6 +180,8 @@ private:
     }
 
 private:
+    //NodeMaop是一个哈希表，存储键与节点指针的映射关系，便于快速查找节点
+    //NodePtr是一个智能指针，管理节点的生命周期，自动释放内存，避免内存泄漏
     int           capacity_; // 缓存容量
     NodeMap       nodeMap_; // key -> Node 
     std::mutex    mutex_;
@@ -191,7 +200,7 @@ public:
         , k_(k)
     {}
 
-    Value get(Key key) 
+    Value get(Key key) //父类不是虚类，已经完成了重写，无需再添加override关键字
     {
         // 首先尝试从主缓存获取数据
         Value value{};
@@ -271,14 +280,14 @@ private:
     std::unordered_map<Key, Value>          historyValueMap_; // 存储未达到k次访问的数据值
 };
 
-// lru优化：对lru进行分片，提高高并发使用的性能
+// lru优化：对lru进行分片，提高高并使用的性能
 template<typename Key, typename Value>
 class KHashLruCaches
 {
 public:
     KHashLruCaches(size_t capacity, int sliceNum)
         : capacity_(capacity)
-        , sliceNum_(sliceNum > 0 ? sliceNum : std::thread::hardware_concurrency())
+        , sliceNum_(sliceNum > 0 ? sliceNum : std::thread::hardware_concurrency())//__返回当前 CPU 支持的硬件并发线程数__。
     {
         size_t sliceSize = std::ceil(capacity / static_cast<double>(sliceNum_)); // 获取每个分片的大小
         for (int i = 0; i < sliceNum_; ++i)

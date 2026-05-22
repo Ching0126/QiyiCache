@@ -1,0 +1,3 @@
+/home/ubuntu/qiyi/C++/KamaCache/build/CMakeFiles/main.dir
+/home/ubuntu/qiyi/C++/KamaCache/build/CMakeFiles/edit_cache.dir
+/home/ubuntu/qiyi/C++/KamaCache/build/CMakeFiles/rebuild_cache.dir
