@@ -60,19 +60,36 @@ public:
     }
 
 private:
+    // ARC 幽灵缓存检查 —— 自适应容量调节的核心机制
+    // 
+    // 背景：
+    //   ARC 维护两组缓存：T1(一次命中)/T2(多次命中)，以及对应的幽灵缓存 B1/B2。
+    //   幽灵缓存只存 key（不存 value），当淘汰的 key 被再次访问时触发容量调整。
+    //
+    // 逻辑：
+    //   如果 key 命中 B1（LRU 幽灵）→ 说明最近太早淘汰了一次命中页，
+    //      应缩小 LFU 容量，扩大 LRU 容量，让 T1 能多保留一些。
+    //   如果 key 命中 B2（LFU 幽灵）→ 说明最近太早淘汰了多次命中页，
+    //      应缩小 LRU 容量，扩大 LFU 容量，让 T2 能多保留一些。
+    //
+    //   容量约束始终满足：|T1| + |T2| ≤ 总容量
     bool checkGhostCaches(Key key) 
     {
         bool inGhost = false;
+        // 检查 key 是否在 LRU 幽灵缓存 (B1) 中
         if (lruPart_->checkGhost(key)) 
         {
+            // 命中 B1：优先缩小 LFU 容量，把省下的配额给 LRU
             if (lfuPart_->decreaseCapacity()) 
             {
                 lruPart_->increaseCapacity();
             }
             inGhost = true;
         } 
+        // 检查 key 是否在 LFU 幽灵缓存 (B2) 中
         else if (lfuPart_->checkGhost(key)) 
         {
+            // 命中 B2：优先缩小 LRU 容量，把省下的配额给 LFU
             if (lruPart_->decreaseCapacity()) 
             {
                 lfuPart_->increaseCapacity();
