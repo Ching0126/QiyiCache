@@ -299,8 +299,8 @@ void KLfuCache<Key, Value>::handleOverMaxAverageNum()
         if (node->freq < 1)
             node->freq = 1;
 
-        int delta = node->freq - oldFreq; 
-        curTotalNum_ += delta;
+        int delta = node->freq - oldFreq; //`delta` 一定是负数（或 0）。即原有访问频次与新的访问频次之间的差值，表示访问频次的减少量。
+        curTotalNum_ += delta;//缓存中所有节点频次的总和，减去差额，就是新值。
 
         // 添加到新的频率列表
         addToFreqList(node);
@@ -313,15 +313,16 @@ void KLfuCache<Key, Value>::handleOverMaxAverageNum()
 template<typename Key, typename Value>
 void KLfuCache<Key, Value>::updateMinFreq() 
 {
-    minFreq_ = INT8_MAX;
-    for (const auto& pair : freqToFreqList_) 
+    minFreq_ = INT_MAX;//2147483647
+    for  (const auto& pair : freqToFreqList_) //迭代器pair.first是访问频次，pair.second是对应访问频次的链表指针
     {
         if (pair.second && !pair.second->isEmpty()) 
         {
-            minFreq_ = std::min(minFreq_, pair.first);
+            minFreq_ = std::min(minFreq_, pair.first);//所有节点里最小的访问频次
         }
     }
-    if (minFreq_ == INT8_MAX) 
+    // 如果所有链表都空，设为 1
+    if (minFreq_ == INT_MAX) 
         minFreq_ = 1;
 }
 
