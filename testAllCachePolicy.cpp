@@ -11,6 +11,7 @@
 #include "KLruCache.h"
 #include "KArcCache/KArcCache.h"
 
+//只定义了，没有实例化。
 class Timer {
 public:
     Timer() : start_(std::chrono::high_resolution_clock::now()) {}

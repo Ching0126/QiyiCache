@@ -336,6 +336,7 @@ public:
         , capacity_(capacity)
     {
         size_t sliceSize = std::ceil(capacity_ / static_cast<double>(sliceNum_)); // 每个lfu分片的容量
+        //static_cast显示运算符，__将 `sliceNum_`（`int` 类型）转换为 `double` 类型__。
         for (int i = 0; i < sliceNum_; ++i)
         {
             lfuSliceCaches_.emplace_back(new KLfuCache<Key, Value>(sliceSize, maxAverageNum));
